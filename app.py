@@ -1,97 +1,66 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
-import requests
-from plotly.offline import iplot
 import plotly.graph_objs as go
-import plotly.express as px
-from pandas.io.json import json_normalize
-# from streamlit.ScriptRunner import StopException, RerunException
-from streamlit.script_runner import StopException, RerunException
+
+# Load datasets
+df_country = pd.read_csv("country_wise_latest.csv")
+df_daywise = pd.read_csv("day_wise.csv")
+df_grouped = pd.read_csv("full_grouped.csv")
 
 fig = go.Figure()
-st.write("""
-# Covid19 Tracking App 🚑
-
-[Coronavirus COVID19 API](https://documenter.getpostman.com/view/10808728/SzS8rjbc?version=latest#81447902-b68a-4e79-9df9-1b371905e9fa) is used to get the data in this app.
-""")
+st.title("Covid19 Tracking App 🚑")
+st.markdown("Using **Kaggle Clean Complete Dataset** instead of API")
 
 st.write(
-    'Coronavirus is officially a pandemic. Since the first case in december the disease has spread fast reaching almost every corner of the world.' +
-    'They said it\'s not a severe disease but the number of people that needs hospital care is growing as fast as the new cases.' +
-    'Some governments are taking measures to prevent a sanitary collapse to be able to take care of all these people.' +
-    'I\'m tackling this challenge here. Let\'s see how some countries/regions are doing!')
+    "Coronavirus is officially a pandemic. Since the first case in December the disease has spread fast reaching almost every corner of the world. "
+    "The number of people that needs hospital care is growing as fast as the new cases. "
+    "Some governments are taking measures to prevent a sanitary collapse. "
+    "Let's see how some countries/regions are doing!"
+)
 
-url = 'https://api.covid19api.com/countries'
-r = requests.get(url)
-df0 = json_normalize(r.json())
-
-
-
-
-##def new(unc)
-
-top_row = pd.DataFrame({'Country': ['Select a Country'], 'Slug': ['Empty'], 'ISO2': ['E']})
-# Concat with old DataFrame and reset the Index.
-df0 = pd.concat([top_row, df0]).reset_index(drop=True)
-
+# Sidebar
 st.sidebar.header('Create/Filter your search')
-graph_type = st.sidebar.selectbox('Cases type', ('confirmed', 'deaths', 'recovered'))
+graph_type = st.sidebar.selectbox('Cases type', ('Confirmed', 'Deaths', 'Recovered'))
 st.sidebar.subheader('Search by country 📍')
-country = st.sidebar.selectbox('Country', df0.Country)
-country1 = st.sidebar.selectbox('Compare with another Country', df0.Country)
-if st.sidebar.button('Refresh Data'):
-    raise RerunException(st._RerunData(None))
+country = st.sidebar.selectbox('Country', ["Worldwide"] + df_country["Country/Region"].tolist())
+country1 = st.sidebar.selectbox('Compare with another Country', ["None"] + df_country["Country/Region"].tolist())
 
-if country != 'Select a Country':
-    slug = df0.Slug[df0['Country'] == country].to_string(index=False)[1:]
-    url = 'https://api.covid19api.com/total/dayone/country/' + slug + '/status/' + graph_type
-    r = requests.get(url)
-    st.write("""# Total """ + graph_type + """ cases in """ + country + """ are: """ + str(r.json()[-1].get("Cases")))
-    df = json_normalize(r.json())
-    layout = go.Layout(
-        title=country + '\'s ' + graph_type + ' cases Data',
-        xaxis=dict(title='Date'),
-        yaxis=dict(title='Number of cases'), )
-    fig.update_layout(dict1=layout, overwrite=True)
-    fig.add_trace(go.Scatter(x=df.Date, y=df.Cases, mode='lines', name=country))
+# Worldwide data
+if country == "Worldwide":
+    st.subheader("🌍 Worldwide Data")
+    total = df_country["Confirmed"].sum()
+    deaths = df_country["Deaths"].sum()
+    recovered = df_country["Recovered"].sum()
+    st.write(f"Total cases: {total:,}, Total deaths: {deaths:,}, Total recovered: {recovered:,}")
 
-    if country1 != 'Select a Country':
-        slug1 = df0.Slug[df0['Country'] == country1].to_string(index=False)[1:]
-        url = 'https://api.covid19api.com/total/dayone/country/' + slug1 + '/status/' + graph_type
-        r = requests.get(url)
-        st.write(
-            """# Total """ + graph_type + """ cases in """ + country1 + """ are: """ + str(r.json()[-1].get("Cases")))
-        df = json_normalize(r.json())
-        layout = go.Layout(
-            title=country + ' vs ' + country1 + ' ' + graph_type + ' cases Data',
-            xaxis=dict(title='Date'),
-            yaxis=dict(title='Number of cases'), )
-        fig.update_layout(dict1=layout, overwrite=True)
-        fig.add_trace(go.Scatter(x=df.Date, y=df.Cases, mode='lines', name=country1))
-
+    fig.add_trace(go.Scatter(x=df_daywise["Date"], y=df_daywise[graph_type],
+                             mode="lines", name=f"Worldwide {graph_type}"))
     st.plotly_chart(fig, use_container_width=True)
 
+# Country-specific data
 else:
-    url = 'https://api.covid19api.com/world/total'
-    r = requests.get(url)
-    total = r.json()["TotalConfirmed"]
-    deaths = r.json()["TotalDeaths"]
-    recovered = r.json()["TotalRecovered"]
-    st.write("""# Worldwide Data:""")
-    st.write("Total cases: " + str(total) + ", Total deaths: " + str(deaths) + ", Total recovered: " + str(recovered))
-    x = ["TotalCases", "TotalDeaths", "TotalRecovered"]
-    y = [total, deaths, recovered]
+    st.subheader(f"📍 {country} Data")
+    row = df_country[df_country["Country/Region"] == country]
+    st.write(f"Total cases: {int(row['Confirmed'])}, "
+             f"Total deaths: {int(row['Deaths'])}, "
+             f"Total recovered: {int(row['Recovered'])}")
 
-    layout = go.Layout(
-        title='World Data',
-        xaxis=dict(title='Category'),
-        yaxis=dict(title='Number of cases'), )
+    df_filtered = df_grouped[df_grouped["Country/Region"] == country]
+    fig.add_trace(go.Scatter(x=df_filtered["Date"], y=df_filtered[graph_type],
+                             mode="lines", name=country))
 
-    fig.update_layout(dict1=layout, overwrite=True)
-    fig.add_trace(go.Bar(name='World Data', x=x, y=y))
+    # Compare with another country
+    if country1 != "None":
+        row2 = df_country[df_country["Country/Region"] == country1]
+        st.write(f"Total cases in {country1}: {int(row2['Confirmed'])}, "
+                 f"Total deaths: {int(row2['Deaths'])}, "
+                 f"Total recovered: {int(row2['Recovered'])}")
+
+        df_filtered2 = df_grouped[df_grouped["Country/Region"] == country1]
+        fig.add_trace(go.Scatter(x=df_filtered2["Date"], y=df_filtered2[graph_type],
+                                 mode="lines", name=country1))
+
     st.plotly_chart(fig, use_container_width=True)
 
-st.sidebar.subheader(
-    """Created with 💖 in India by AI Probably """)
+st.sidebar.subheader("Created with 💖 in India")
 st.sidebar.image('logo.jpg', width=300)
