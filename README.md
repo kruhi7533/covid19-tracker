@@ -1,4 +1,4 @@
-Covid19 Tracking App 🚑
+                                                                                                      Covid19 Tracking App 🚑
 A fully interactive Covid-19 tracking and visualization app built using Python, Streamlit, and Plotly. Analyze and compare global and country-specific pandemic data with comprehensive visualizations powered by publicly available CSV datasets.
 
 Features
